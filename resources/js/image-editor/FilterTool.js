@@ -162,6 +162,15 @@ export class FilterTool {
         this.editor.historyManager.saveState();
     }
 
+    // Method to allow programmatic control of a filter
+    setFilterValue(filterName, value) {
+        if (this.filters.hasOwnProperty(filterName)) {
+            this.filters[filterName] = value;
+            this.applyFilters();
+            this.updateSliders(); // Keep UI in sync
+        }
+    }
+
     // Apply filters permanently to canvas data
     applyFiltersToCanvas() {
         if (!this.editor.currentImage) return;

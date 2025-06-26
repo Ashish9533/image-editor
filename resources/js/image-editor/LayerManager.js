@@ -33,7 +33,9 @@ export class LayerManager {
             data: data,
             type: type, // 'image', 'text', 'sticker'
             opacity: 1,
-            visible: true
+            visible: true,
+            animation: null, // To store animation settings
+            originalOpacity: 1 // Store the base opacity
         };
 
         this.layers.push(layer);
@@ -42,6 +44,14 @@ export class LayerManager {
         this.renderAllLayers();
         
         return layer;
+    }
+
+    updateLayer(layerId, newName) {
+        const layer = this.layers.find(l => l.id === layerId);
+        if (layer) {
+            layer.name = newName;
+            this.updateLayersList();
+        }
     }
 
     updateLayersList() {
@@ -102,6 +112,7 @@ export class LayerManager {
         if (!this.activeLayer) return;
         
         this.activeLayer.opacity = opacity;
+        this.activeLayer.originalOpacity = opacity; // Update original opacity as well
         this.updateLayersList();
         this.renderAllLayers();
     }
@@ -136,24 +147,33 @@ export class LayerManager {
         }
     }
 
-    deleteActiveLayer() {
-        if (!this.activeLayer || this.layers.length <= 1) return;
-        
-        const layerIndex = this.layers.findIndex(l => l.id === this.activeLayer.id);
+    deleteLayer(layerId) {
+        if (this.layers.length <= 1) return false;
+
+        const layerIndex = this.layers.findIndex(l => l.id === layerId);
+        if (layerIndex === -1) return false;
+
         this.layers.splice(layerIndex, 1);
-        
-        // Select next layer or previous if at end
-        if (layerIndex < this.layers.length) {
-            this.activeLayer = this.layers[layerIndex];
-        } else if (this.layers.length > 0) {
-            this.activeLayer = this.layers[this.layers.length - 1];
-        } else {
-            this.activeLayer = null;
+
+        if (this.activeLayer && this.activeLayer.id === layerId) {
+            if (this.layers.length > 0) {
+                this.activeLayer = this.layers[Math.min(layerIndex, this.layers.length - 1)];
+            } else {
+                this.activeLayer = null;
+            }
         }
         
         this.updateLayersList();
         this.renderAllLayers();
-        this.editor.historyManager.saveState();
+        return true;
+    }
+
+    deleteActiveLayer() {
+        if (!this.activeLayer) return;
+        
+        if (this.deleteLayer(this.activeLayer.id)) {
+            this.editor.historyManager.saveState();
+        }
     }
 
     renderAllLayers() {
@@ -164,23 +184,58 @@ export class LayerManager {
             
             this.editor.ctx.save();
             this.editor.ctx.globalAlpha = layer.opacity;
-            
-            switch (layer.type) {
-                case 'image':
-                    if (layer.data instanceof Image) {
-                        this.editor.ctx.drawImage(layer.data, 0, 0);
-                    }
-                    break;
-                case 'text':
-                    this.editor.tools.text.renderTextLayer(layer);
-                    break;
-                case 'sticker':
-                    this.editor.tools.sticker.renderStickerLayer(layer);
-                    break;
+
+            if (layer.animation && layer.animation.type === 'wipe' && layer.animationProgress != null) {
+                this.applyWipeAnimation(layer);
+            } else {
+                this.drawLayer(layer);
             }
             
             this.editor.ctx.restore();
         });
+    }
+
+    drawLayer(layer, ctx = this.editor.ctx) {
+        switch (layer.type) {
+            case 'image':
+                if (layer.data instanceof Image) {
+                    ctx.drawImage(layer.data, 0, 0);
+                }
+                break;
+            case 'text':
+                this.editor.tools.text.renderTextLayer(layer, ctx);
+                break;
+            case 'sticker':
+                this.editor.tools.sticker.renderStickerLayer(layer, ctx);
+                break;
+            case 'shape':
+                this.editor.tools.shapes.renderShapeLayer(layer, ctx);
+                break;
+        }
+    }
+
+    applyWipeAnimation(layer) {
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = this.editor.canvas.width;
+        tempCanvas.height = this.editor.canvas.height;
+        
+        const originalOpacity = layer.opacity;
+        const layerToDraw = { ...layer, opacity: 1.0 };
+        
+        // Draw the full layer onto the temporary canvas by passing its context
+        this.drawLayer(layerToDraw, tempCtx);
+
+        const wipeWidth = tempCanvas.width * layer.animationProgress;
+        
+        if (wipeWidth > 0) {
+            this.editor.ctx.globalAlpha = originalOpacity;
+            this.editor.ctx.drawImage(
+                tempCanvas,
+                0, 0, wipeWidth, tempCanvas.height,
+                0, 0, wipeWidth, tempCanvas.height
+            );
+        }
     }
 
     reset() {

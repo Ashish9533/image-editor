@@ -30,6 +30,15 @@ export class TextTool {
             opacity: 100,
             rotation: 0,
             align: 'left',
+            letterSpacing: 0,
+            lineHeight: 1.2,
+            strokeEnabled: false,
+            strokeColor: '#ffffff',
+            strokeWidth: 1,
+            gradientEnabled: false,
+            gradientColor1: '#ff0000',
+            gradientColor2: '#0000ff',
+            gradientDirection: 'horizontal',
             wordColors: {} // Store individual word colors
         };
         
@@ -50,6 +59,23 @@ export class TextTool {
         const textRotation = document.getElementById('text-rotation');
         const textRotationValue = document.getElementById('text-rotation-value');
         
+        // New controls
+        const letterSpacing = document.getElementById('letter-spacing');
+        const letterSpacingValue = document.getElementById('letter-spacing-value');
+        const lineHeight = document.getElementById('line-height');
+        const lineHeightValue = document.getElementById('line-height-value');
+        const strokeEnable = document.getElementById('stroke-enable');
+        const strokeColor = document.getElementById('stroke-color');
+        const strokeWidth = document.getElementById('stroke-width');
+        const strokeWidthValue = document.getElementById('stroke-width-value');
+        const strokeOptions = document.getElementById('stroke-options');
+
+        const gradientEnable = document.getElementById('gradient-enable');
+        const gradientOptions = document.getElementById('gradient-options');
+        const gradientColor1 = document.getElementById('gradient-color-1');
+        const gradientColor2 = document.getElementById('gradient-color-2');
+        const gradientDirection = document.getElementById('gradient-direction');
+
         // Style buttons
         const textBold = document.getElementById('text-bold');
         const textItalic = document.getElementById('text-italic');
@@ -101,6 +127,51 @@ export class TextTool {
                 this.updateTextProperty('rotation', rotation);
             });
         }
+        
+        // New control listeners
+        if (letterSpacing) {
+            letterSpacing.addEventListener('input', (e) => {
+                const spacing = parseInt(e.target.value);
+                if (letterSpacingValue) letterSpacingValue.textContent = spacing + 'px';
+                this.updateTextProperty('letterSpacing', spacing);
+            });
+        }
+        
+        if (lineHeight) {
+            lineHeight.addEventListener('input', (e) => {
+                const height = parseInt(e.target.value);
+                if (lineHeightValue) lineHeightValue.textContent = height + '%';
+                this.updateTextProperty('lineHeight', height / 100);
+            });
+        }
+
+        if (strokeEnable) {
+            strokeEnable.addEventListener('change', (e) => {
+                const enabled = e.target.checked;
+                this.updateTextProperty('strokeEnabled', enabled);
+                strokeOptions.classList.toggle('hidden', !enabled);
+            });
+        }
+        if (strokeColor) strokeColor.addEventListener('change', (e) => this.updateTextProperty('strokeColor', e.target.value));
+
+        if (strokeWidth) {
+            strokeWidth.addEventListener('input', (e) => {
+                const width = parseInt(e.target.value);
+                if (strokeWidthValue) strokeWidthValue.textContent = width + 'px';
+                this.updateTextProperty('strokeWidth', width);
+            });
+        }
+
+        if (gradientEnable) {
+            gradientEnable.addEventListener('change', (e) => {
+                const enabled = e.target.checked;
+                this.updateTextProperty('gradientEnabled', enabled);
+                gradientOptions.classList.toggle('hidden', !enabled);
+            });
+        }
+        if (gradientColor1) gradientColor1.addEventListener('change', (e) => this.updateTextProperty('gradientColor1', e.target.value));
+        if (gradientColor2) gradientColor2.addEventListener('change', (e) => this.updateTextProperty('gradientColor2', e.target.value));
+        if (gradientDirection) gradientDirection.addEventListener('change', (e) => this.updateTextProperty('gradientDirection', e.target.value));
 
         // Style buttons
         if (textBold) textBold.addEventListener('click', () => this.toggleStyle('bold'));
@@ -368,7 +439,8 @@ export class TextTool {
         this.updateWordPicker();
         
         // Add to layer manager
-        this.editor.layerManager.addLayer(`Text: ${newText.text.substring(0, 10)}...`, newText, 'text');
+        const newLayer = this.editor.layerManager.addLayer(`Text: ${newText.text.substring(0, 10)}...`, newText, 'text');
+        newText.layerId = newLayer.id;
         this.editor.historyManager.saveState();
     }
 
@@ -384,6 +456,11 @@ export class TextTool {
             // Enable text controls if not already visible
             const textControls = document.getElementById('text-controls');
             if (textControls) textControls.classList.remove('hidden');
+        }
+        
+        // Update layer manager
+        if (this.currentTextElement.layerId) {
+            this.editor.layerManager.updateLayer(this.currentTextElement.layerId, `Text: ${this.currentTextElement.text.substring(0, 10)}...`);
         }
     }
 
@@ -407,7 +484,9 @@ export class TextTool {
         this.updateWordPicker();
         
         // Update layer manager
-        this.editor.layerManager.updateLayer(this.currentTextElement, `Text: ${this.currentTextElement.text.substring(0, 10)}...`);
+        if (this.currentTextElement.layerId) {
+            this.editor.layerManager.updateLayer(this.currentTextElement.layerId, `Text: ${this.currentTextElement.text.substring(0, 10)}...`);
+        }
     }
 
     updateTextProperty(property, value) {
@@ -475,18 +554,24 @@ export class TextTool {
             y: this.currentTextElement.y + 20,
             wordColors: { ...this.currentTextElement.wordColors } // Copy word colors
         };
+        delete duplicatedText.layerId;
 
         this.textElements.push(duplicatedText);
         this.selectText(duplicatedText.id);
         
         this.editor.redraw();
         this.updateTextElementsList();
-        this.editor.layerManager.addLayer(`Text: ${duplicatedText.text.substring(0, 10)}...`, duplicatedText, 'text');
+        const newLayer = this.editor.layerManager.addLayer(`Text: ${duplicatedText.text.substring(0, 10)}...`, duplicatedText, 'text');
+        duplicatedText.layerId = newLayer.id;
         this.editor.historyManager.saveState();
     }
 
     deleteCurrentText() {
         if (!this.currentTextElement) return;
+
+        if (this.currentTextElement.layerId) {
+            this.editor.layerManager.deleteLayer(this.currentTextElement.layerId);
+        }
 
         const index = this.textElements.findIndex(t => t.id === this.currentTextElement.id);
         if (index > -1) {
@@ -567,9 +652,26 @@ export class TextTool {
         const textRotation = document.getElementById('text-rotation');
         const textRotationValue = document.getElementById('text-rotation-value');
 
+        // New controls
+        const letterSpacing = document.getElementById('letter-spacing');
+        const letterSpacingValue = document.getElementById('letter-spacing-value');
+        const lineHeight = document.getElementById('line-height');
+        const lineHeightValue = document.getElementById('line-height-value');
+        const strokeEnable = document.getElementById('stroke-enable');
+        const strokeColor = document.getElementById('stroke-color');
+        const strokeWidth = document.getElementById('stroke-width');
+        const strokeWidthValue = document.getElementById('stroke-width-value');
+        const strokeOptions = document.getElementById('stroke-options');
+
+        const gradientEnable = document.getElementById('gradient-enable');
+        const gradientOptions = document.getElementById('gradient-options');
+        const gradientColor1 = document.getElementById('gradient-color-1');
+        const gradientColor2 = document.getElementById('gradient-color-2');
+        const gradientDirection = document.getElementById('gradient-direction');
+
         if (textInput) textInput.value = textElement.text;
         if (fontSizeSlider) fontSizeSlider.value = textElement.fontSize;
-        if (fontSizeValue) fontSizeValue.textContent = textElement.fontSize;
+        if (fontSizeValue) fontSizeValue.textContent = textElement.fontSize + 'px';
         if (fontFamily) fontFamily.value = textElement.fontFamily;
         if (textColor) textColor.value = textElement.color;
         if (textBgColor) textBgColor.value = textElement.backgroundColor;
@@ -578,6 +680,24 @@ export class TextTool {
         if (textOpacityValue) textOpacityValue.textContent = textElement.opacity + '%';
         if (textRotation) textRotation.value = textElement.rotation;
         if (textRotationValue) textRotationValue.textContent = textElement.rotation + '°';
+
+        // Update new controls
+        if (letterSpacing) letterSpacing.value = textElement.letterSpacing;
+        if (letterSpacingValue) letterSpacingValue.textContent = textElement.letterSpacing + 'px';
+        if (lineHeight) lineHeight.value = textElement.lineHeight * 100;
+        if (lineHeightValue) lineHeightValue.textContent = Math.round(textElement.lineHeight * 100) + '%';
+        
+        if (strokeEnable) strokeEnable.checked = textElement.strokeEnabled;
+        if (strokeOptions) strokeOptions.classList.toggle('hidden', !textElement.strokeEnabled);
+        if (strokeColor) strokeColor.value = textElement.strokeColor;
+        if (strokeWidth) strokeWidth.value = textElement.strokeWidth;
+        if (strokeWidthValue) strokeWidthValue.textContent = textElement.strokeWidth + 'px';
+
+        if (gradientEnable) gradientEnable.checked = textElement.gradientEnabled;
+        if (gradientOptions) gradientOptions.classList.toggle('hidden', !textElement.gradientEnabled);
+        if (gradientColor1) gradientColor1.value = textElement.gradientColor1;
+        if (gradientColor2) gradientColor2.value = textElement.gradientColor2;
+        if (gradientDirection) gradientDirection.value = textElement.gradientDirection;
 
         // Update style buttons
         this.updateStyleButtons(textElement);
@@ -706,8 +826,9 @@ export class TextTool {
         ctx.restore();
     }
 
-    renderTextLayer(layer) {
-        this.drawSingleText(layer.data);
+    renderTextLayer(layer, ctx = this.editor.ctx) {
+        // Pass the entire layer object so we can access animation-modified properties
+        this.drawSingleText(layer.data, layer, ctx);
     }
 
     // Public method to get all text elements
@@ -752,8 +873,9 @@ export class TextTool {
     }
 
     getWordsFromText(text) {
-        // Split by spaces and newlines but preserve them
-        return text.split(/(\s+|\n)/);
+        // This regex splits by any whitespace character while preserving them as tokens.
+        // It correctly handles leading/trailing spaces and multiple spaces between words.
+        return text.split(/(\s+)/).filter(s => s.length > 0);
     }
 
     selectWord(wordIndex, wordElement) {
@@ -852,29 +974,34 @@ export class TextTool {
         this.currentTextElement.wordColors = newWordColors;
     }
 
-    drawSingleText(textElement) {
-        const ctx = this.editor.ctx;
+    drawSingleText(textElement, layer = { data: textElement }, ctx = this.editor.ctx) {
         ctx.save();
 
-        // Set opacity
-        ctx.globalAlpha = textElement.opacity / 100;
+        // Use layer's opacity if available (for animations)
+        ctx.globalAlpha = layer.opacity !== undefined ? layer.opacity : textElement.opacity / 100;
         
+        // Handle animated scale
+        const scale = layer.animationScale || 1;
+        const finalFontSize = textElement.fontSize * scale;
+
         // Set font
         let fontString = '';
         if (textElement.italic) fontString += 'italic ';
         if (textElement.bold) fontString += 'bold ';
-        fontString += `${textElement.fontSize}px ${textElement.fontFamily}`;
+        fontString += `${finalFontSize}px ${textElement.fontFamily}`;
         
         ctx.font = fontString;
+        ctx.letterSpacing = `${textElement.letterSpacing}px`;
         
         // Set text alignment
-        ctx.textAlign = textElement.align;
+        ctx.textAlign = 'left'; // We do alignment manually for word-by-word coloring
         ctx.textBaseline = 'top';
         
-        // Apply rotation if needed
-        if (textElement.rotation !== 0) {
+        // Apply rotation if needed (use animated value if available)
+        const rotation = layer.data.rotation !== undefined ? layer.data.rotation : textElement.rotation;
+        if (rotation !== 0) {
             ctx.translate(textElement.x, textElement.y);
-            ctx.rotate((textElement.rotation * Math.PI) / 180);
+            ctx.rotate((rotation * Math.PI) / 180);
             ctx.translate(-textElement.x, -textElement.y);
         }
         
@@ -886,79 +1013,130 @@ export class TextTool {
             ctx.shadowOffsetY = 2;
         }
         
-        // Split text by lines and draw each line with individual word colors
+        const allTokens = this.getWordsFromText(textElement.text);
         const lines = textElement.text.split('\n');
-        let wordIndex = 0;
-        
-        lines.forEach((line, lineIndex) => {
-            const lineY = textElement.y + (lineIndex * textElement.fontSize * 1.2);
-            const words = line.split(/(\s+)/); // Split but preserve spaces
+        let tokenIndex = 0;
+
+        const lineMetrics = lines.map(line => {
+            const lineTokens = [];
+            let currentLineLength = 0;
+            let startIndex = tokenIndex;
             
-            let currentX = textElement.x;
+            while(tokenIndex < allTokens.length) {
+                const token = allTokens[tokenIndex];
+                lineTokens.push(token);
+                currentLineLength += token.length;
+                tokenIndex++;
+                if (currentLineLength >= line.length) break;
+            }
+
+            // Account for the newline character in the token stream
+            if (tokenIndex < allTokens.length && allTokens[tokenIndex] === '\n') {
+                tokenIndex++;
+            }
             
-            // Adjust starting X based on alignment
+            return {
+                text: line,
+                tokens: lineTokens,
+                startIndex: startIndex,
+                width: this.measureLine(ctx, lineTokens, textElement.letterSpacing)
+            };
+        });
+
+        lineMetrics.forEach((line, lineIndex) => {
+            // Use animated values if available, otherwise use textElement's properties
+            const currentX = layer.data.x || textElement.x;
+            const currentY = layer.data.y || textElement.y;
+
+            const lineY = currentY + (lineIndex * finalFontSize * textElement.lineHeight);
+            
+            let lineStartX = currentX;
             if (textElement.align === 'center') {
-                const lineWidth = ctx.measureText(line).width;
-                currentX -= lineWidth / 2;
+                lineStartX = currentX - line.width / 2;
             } else if (textElement.align === 'right') {
-                const lineWidth = ctx.measureText(line).width;
-                currentX -= lineWidth;
+                lineStartX = currentX - line.width;
             }
             
-            // Draw background if enabled (for the entire line)
             if (textElement.backgroundEnabled) {
-                const lineWidth = ctx.measureText(line).width;
                 ctx.fillStyle = textElement.backgroundColor;
-                
-                let bgX = currentX;
-                ctx.fillRect(bgX - 2, lineY - 2, lineWidth + 4, textElement.fontSize + 4);
+                ctx.fillRect(lineStartX - 2, lineY - 2, line.width + 4, finalFontSize * textElement.lineHeight + 4);
             }
+
+            let currentTokenX = lineStartX;
             
-            // Draw each word with its individual color
-            words.forEach(word => {
-                if (word === '') return;
+            line.tokens.forEach((word, indexInLine) => {
+                const absoluteTokenIndex = line.startIndex + indexInLine;
                 
-                // Set color for this word
-                const wordColor = textElement.wordColors && textElement.wordColors[wordIndex] 
-                    ? textElement.wordColors[wordIndex] 
-                    : textElement.color;
+                let wordColor = textElement.wordColors[absoluteTokenIndex] || textElement.color;
+                
+                if (textElement.gradientEnabled) {
+                    wordColor = this.getGradient(ctx, currentTokenX, lineY, textElement);
+                }
                 
                 ctx.fillStyle = wordColor;
                 
-                // Draw the word
-                ctx.fillText(word, currentX, lineY);
-                
-                // Draw underline if needed
+                if (textElement.strokeEnabled && textElement.strokeWidth > 0) {
+                    ctx.strokeStyle = textElement.strokeColor;
+                    ctx.lineWidth = textElement.strokeWidth;
+                    ctx.strokeText(word, currentTokenX, lineY);
+                }
+
+                ctx.fillText(word, currentTokenX, lineY);
+
+                const wordWidth = ctx.measureText(word).width + (word.length > 1 ? (word.length * textElement.letterSpacing) : 0);
+
                 if (textElement.underline) {
-                    const wordWidth = ctx.measureText(word).width;
-                    const underlineY = lineY + textElement.fontSize + 2;
-                    
+                    const underlineY = lineY + finalFontSize + 2;
                     ctx.strokeStyle = wordColor;
-                    ctx.lineWidth = Math.max(1, textElement.fontSize / 20);
+                    ctx.lineWidth = Math.max(1, finalFontSize / 20);
                     ctx.beginPath();
-                    ctx.moveTo(currentX, underlineY);
-                    ctx.lineTo(currentX + wordWidth, underlineY);
+                    ctx.moveTo(currentTokenX, underlineY);
+                    ctx.lineTo(currentTokenX + wordWidth, underlineY);
                     ctx.stroke();
                 }
                 
-                // Move X position for next word
-                currentX += ctx.measureText(word).width;
-                
-                // Only increment word index for non-space words
-                if (word.trim() !== '') {
-                    wordIndex++;
-                }
+                currentTokenX += wordWidth;
             });
-            
-            // Add word index for line break
-            wordIndex++;
         });
 
-        // Draw selection indicator if this text is selected
         if (this.selectedTextId === textElement.id && !this.isDragging) {
             this.drawTextSelectionIndicator(textElement);
         }
 
         ctx.restore();
+    }
+    
+    getGradient(ctx, x, y, textElement) {
+        let gradient;
+        const width = this.measureTextWidth(textElement);
+        const height = textElement.fontSize;
+
+        switch (textElement.gradientDirection) {
+            case 'vertical':
+                gradient = ctx.createLinearGradient(x, y, x, y + height);
+                break;
+            case 'diagonal':
+                gradient = ctx.createLinearGradient(x, y, x + width, y + height);
+                break;
+            case 'horizontal':
+            default:
+                gradient = ctx.createLinearGradient(x, y, x + width, y);
+                break;
+        }
+        
+        gradient.addColorStop(0, textElement.gradientColor1);
+        gradient.addColorStop(1, textElement.gradientColor2);
+        return gradient;
+    }
+
+    measureLine(ctx, words, letterSpacing) {
+        let width = 0;
+        words.forEach(word => {
+            width += ctx.measureText(word).width;
+            if (word.length > 1) { // Add letter spacing for words, not single chars like space
+                 width += (word.length * letterSpacing);
+            }
+        });
+        return width;
     }
 }

@@ -52,6 +52,12 @@
                                 </svg>
                                 <span class="text-xs">Text</span>
                             </button>
+                            <button class="tool-tab px-3 py-2 rounded text-sm font-medium" data-tool="shapes">
+                                <svg class="w-4 h-4 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.25 10.75A.75.75 0 014 10h16a.75.75 0 010 1.5H4a.75.75 0 01-.75-.75z"/>
+                                </svg>
+                                <span class="text-xs">Shapes</span>
+                            </button>
                             <button class="tool-tab px-3 py-2 rounded text-sm font-medium" data-tool="sticker">
                                 <svg class="w-4 h-4 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.01M15 10h1.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -70,6 +76,12 @@
                                 </svg>
                                 <span class="text-xs">Filters</span>
                             </button>
+                            <button class="tool-tab px-3 py-2 rounded text-sm font-medium" data-tool="animations">
+                                <svg class="w-4 h-4 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.01M15 10h1.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span class="text-xs">Animations</span>
+                            </button>
                         </div>
                         
                         <!-- Tool Panels -->
@@ -80,6 +92,9 @@
                             <div id="tool-text" class="tool-panel-content hidden">
                                 <x-image-editor.text-panel />
                             </div>
+                            <div id="tool-shapes" class="tool-panel-content hidden">
+                                <x-image-editor.shapes-panel />
+                            </div>
                             <div id="tool-sticker" class="tool-panel-content hidden">
                                 <x-image-editor.sticker-panel />
                             </div>
@@ -88,6 +103,9 @@
                             </div>
                             <div id="tool-filters" class="tool-panel-content hidden">
                                 <x-image-editor.filters-panel />
+                            </div>
+                            <div id="tool-animations" class="tool-panel-content hidden">
+                                <x-image-editor.animations-panel />
                             </div>
                         </div>
                     </div>

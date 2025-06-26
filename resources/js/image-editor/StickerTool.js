@@ -1,168 +1,237 @@
 export class StickerTool {
     constructor(editor) {
         this.editor = editor;
-        this.isActive = false;
-        this.selectedSticker = null;
-        this.stickerSize = 40;
+        this.activeStickerLayer = null; // The currently selected sticker *layer* object
+        this.selectedStickerEmoji = null; // The emoji string to be placed from the panel
+        
+        this.isDragging = false;
+        this.dragOffset = { x: 0, y: 0 };
         
         this.setupEventListeners();
     }
 
     setupEventListeners() {
+        // Panel controls
         const stickerButtons = document.querySelectorAll('.sticker-btn');
-        const stickerSizeSlider = document.getElementById('sticker-size');
-        const stickerSizeValue = document.getElementById('sticker-size-value');
-
         stickerButtons.forEach(btn => {
-            btn.addEventListener('click', () => this.selectSticker(btn.dataset.sticker));
+            btn.addEventListener('click', () => this.onSelectStickerFromPanel(btn.dataset.sticker));
         });
 
-        stickerSizeSlider.addEventListener('input', (e) => {
-            this.stickerSize = parseInt(e.target.value);
-            stickerSizeValue.textContent = this.stickerSize + 'px';
-        });
+        // Property controls
+        const sizeSlider = document.getElementById('sticker-size');
+        const rotationSlider = document.getElementById('sticker-rotation');
+        const opacitySlider = document.getElementById('sticker-opacity');
 
-        // Canvas click to place sticker
-        this.editor.canvas.addEventListener('click', (e) => this.onCanvasClick(e));
-    }
-
-    selectSticker(sticker) {
-        this.selectedSticker = sticker;
-        this.isActive = true;
-        
-        // Highlight selected sticker
-        document.querySelectorAll('.sticker-btn').forEach(btn => {
-            btn.classList.remove('ring-2', 'ring-blue-500');
-        });
-        
-        const selectedBtn = document.querySelector(`[data-sticker="${sticker}"]`);
-        selectedBtn.classList.add('ring-2', 'ring-blue-500');
-        
-        // Show controls
-        document.getElementById('sticker-controls').classList.remove('hidden');
-        
-        // Change cursor
-        this.editor.canvas.style.cursor = 'crosshair';
-        
-        // Show size in real-time preview
-        this.showStickerPreview();
-    }
-
-    showStickerPreview() {
-        // Remove existing preview
-        const existingPreview = document.getElementById('sticker-preview');
-        if (existingPreview) {
-            existingPreview.remove();
-        }
-
-        // Create preview element
-        const preview = document.createElement('div');
-        preview.id = 'sticker-preview';
-        preview.style.cssText = `
-            position: fixed;
-            pointer-events: none;
-            z-index: 1000;
-            font-size: ${this.stickerSize}px;
-            opacity: 0.7;
-            display: none;
-        `;
-        preview.textContent = this.selectedSticker;
-        document.body.appendChild(preview);
-
-        // Track mouse movement
-        const onMouseMove = (e) => {
-            if (!this.isActive) {
-                preview.style.display = 'none';
-                return;
+        if (sizeSlider) sizeSlider.addEventListener('input', (e) => this.updateActiveStickerProperty('size', parseInt(e.target.value)));
+        if (rotationSlider) rotationSlider.addEventListener('input', (e) => this.updateActiveStickerProperty('rotation', parseInt(e.target.value)));
+        if (opacitySlider) opacitySlider.addEventListener('input', (e) => {
+            if (this.activeStickerLayer) {
+                const newOpacity = parseInt(e.target.value) / 100;
+                this.activeStickerLayer.opacity = newOpacity; // Directly update layer opacity
+                this.updateControls(); // This will update the slider text
+                this.editor.redraw(); // Redraw with new opacity
             }
-            preview.style.display = 'block';
-            preview.style.left = (e.clientX + 10) + 'px';
-            preview.style.top = (e.clientY - 10) + 'px';
-        };
+        });
+        
+        // Action buttons
+        const duplicateBtn = document.getElementById('sticker-duplicate');
+        const deleteBtn = document.getElementById('sticker-delete');
 
-        document.addEventListener('mousemove', onMouseMove);
+        if (duplicateBtn) duplicateBtn.addEventListener('click', () => this.duplicateActiveSticker());
+        if (deleteBtn) deleteBtn.addEventListener('click', () => this.deleteActiveSticker());
 
-        // Clean up preview when mode changes
-        const originalCancelMode = () => {
-            preview.remove();
-            document.removeEventListener('mousemove', onMouseMove);
-        };
-
-        // Store cleanup function
-        this.cleanupPreview = originalCancelMode;
+        // Canvas events
+        this.editor.canvas.addEventListener('mousedown', this.onCanvasMouseDown.bind(this));
+        this.editor.canvas.addEventListener('mousemove', this.onCanvasMouseMove.bind(this));
+        this.editor.canvas.addEventListener('mouseup', this.onCanvasMouseUp.bind(this));
+        
+        // Touch events
+        this.editor.canvas.addEventListener('touchstart', (e) => { e.preventDefault(); this.onCanvasMouseDown(e.touches[0]); }, { passive: false });
+        this.editor.canvas.addEventListener('touchmove', (e) => { e.preventDefault(); this.onCanvasMouseMove(e.touches[0]); }, { passive: false });
+        this.editor.canvas.addEventListener('touchend', (e) => { e.preventDefault(); this.onCanvasMouseUp(e.changedTouches[0]); }, { passive: false });
     }
 
-    onCanvasClick(e) {
-        if (!this.isActive || !this.selectedSticker) return;
+    onSelectStickerFromPanel(stickerEmoji) {
+        this.selectedStickerEmoji = stickerEmoji;
+        this.editor.canvas.style.cursor = 'copy';
+        this.setActiveStickerLayer(null);
 
-        const rect = this.editor.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        document.querySelectorAll('.sticker-btn').forEach(btn => btn.classList.remove('ring-2', 'ring-purple-500'));
+        document.querySelector(`[data-sticker="${stickerEmoji}"]`).classList.add('ring-2', 'ring-purple-500');
+    }
+
+    placeSticker(x, y) {
+        if (!this.selectedStickerEmoji) return;
+
+        const stickerData = {
+            id: Date.now(), // Unique ID for the sticker data itself
+            emoji: this.selectedStickerEmoji,
+            x, y,
+            size: 50,
+            rotation: 0,
+            opacity: 1,
+        };
+
+        const newLayer = this.editor.layerManager.addLayer(`Sticker: ${stickerData.emoji}`, stickerData, 'sticker');
+        this.setActiveStickerLayer(newLayer);
+
+        this.selectedStickerEmoji = null;
+        this.editor.canvas.style.cursor = 'default';
+        document.querySelectorAll('.sticker-btn').forEach(btn => btn.classList.remove('ring-2', 'ring-purple-500'));
         
-        // Scale coordinates to canvas size
+        this.editor.historyManager.saveState();
+        this.editor.redraw();
+    }
+    
+    getCanvasCoordinates(e) {
+        const rect = this.editor.canvas.getBoundingClientRect();
         const scaleX = this.editor.canvas.width / rect.width;
         const scaleY = this.editor.canvas.height / rect.height;
-        
-        const canvasX = x * scaleX;
-        const canvasY = y * scaleY;
-
-        this.addStickerAt(canvasX, canvasY);
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    }
+    
+    findStickerAtPosition(x, y) {
+        const stickerLayers = this.editor.layerManager.layers.filter(l => l.type === 'sticker');
+        // Iterate backwards to select the top-most sticker layer
+        for (let i = stickerLayers.length - 1; i >= 0; i--) {
+            const layer = stickerLayers[i];
+            const sticker = layer.data;
+            const dx = x - sticker.x;
+            const dy = y - sticker.y;
+            // Simple bounding box check based on size
+            if (Math.abs(dx) < sticker.size / 2 && Math.abs(dy) < sticker.size / 2) {
+                return layer; // Return the entire layer
+            }
+        }
+        return null;
     }
 
-    addStickerAt(x, y) {
-        const stickerData = {
-            emoji: this.selectedSticker,
-            x: x,
-            y: y,
-            size: this.stickerSize
+    onCanvasMouseDown(e) {
+        const coords = this.getCanvasCoordinates(e);
+
+        if (this.selectedStickerEmoji) {
+            this.placeSticker(coords.x, coords.y);
+            return;
+        }
+
+        const clickedStickerLayer = this.findStickerAtPosition(coords.x, coords.y);
+        this.setActiveStickerLayer(clickedStickerLayer);
+
+        if (clickedStickerLayer) {
+            this.isDragging = true;
+            this.dragOffset = {
+                x: coords.x - clickedStickerLayer.data.x,
+                y: coords.y - clickedStickerLayer.data.y
+            };
+            this.editor.canvas.style.cursor = 'grabbing';
+        }
+        this.editor.redraw();
+    }
+    
+    onCanvasMouseMove(e) {
+        if (this.isDragging && this.activeStickerLayer) {
+            const coords = this.getCanvasCoordinates(e);
+            this.activeStickerLayer.data.x = coords.x - this.dragOffset.x;
+            this.activeStickerLayer.data.y = coords.y - this.dragOffset.y;
+            this.editor.redraw();
+        }
+    }
+
+    onCanvasMouseUp() {
+        if (this.isDragging) {
+            this.editor.historyManager.saveState();
+        }
+        this.isDragging = false;
+        this.editor.canvas.style.cursor = 'default';
+    }
+
+    setActiveStickerLayer(layer) {
+        this.activeStickerLayer = layer;
+        const controls = document.getElementById('sticker-controls');
+        if (layer) {
+            controls.classList.remove('hidden');
+            this.updateControls();
+            this.editor.layerManager.selectLayer(layer);
+        } else {
+            controls.classList.add('hidden');
+        }
+    }
+
+    updateControls() {
+        if (!this.activeStickerLayer) return;
+        const stickerData = this.activeStickerLayer.data;
+        document.getElementById('sticker-size').value = stickerData.size;
+        document.getElementById('sticker-size-value').textContent = `${stickerData.size}px`;
+        document.getElementById('sticker-rotation').value = stickerData.rotation;
+        document.getElementById('sticker-rotation-value').textContent = `${stickerData.rotation}°`;
+        document.getElementById('sticker-opacity').value = this.activeStickerLayer.opacity * 100;
+        document.getElementById('sticker-opacity-value').textContent = `${Math.round(this.activeStickerLayer.opacity * 100)}%`;
+    }
+
+    updateActiveStickerProperty(prop, value) {
+        if (!this.activeStickerLayer) return;
+        this.activeStickerLayer.data[prop] = value;
+        this.updateControls();
+        this.editor.redraw();
+    }
+
+    deleteActiveSticker() {
+        if (!this.activeStickerLayer) return;
+        this.editor.layerManager.deleteLayer(this.activeStickerLayer.id);
+        this.setActiveStickerLayer(null);
+        this.editor.historyManager.saveState();
+        this.editor.redraw();
+    }
+    
+    duplicateActiveSticker() {
+        if (!this.activeStickerLayer) return;
+
+        const oldStickerData = this.activeStickerLayer.data;
+        const newStickerData = {
+            ...oldStickerData,
+            id: Date.now(),
+            x: oldStickerData.x + 20,
+            y: oldStickerData.y + 20,
         };
 
-        this.drawSticker(stickerData);
-        this.editor.layerManager.addLayer(`Sticker: ${this.selectedSticker}`, stickerData, 'sticker');
+        const newLayer = this.editor.layerManager.addLayer(`Sticker: ${newStickerData.emoji}`, newStickerData, 'sticker');
+        this.setActiveStickerLayer(newLayer);
         this.editor.historyManager.saveState();
+        this.editor.redraw();
     }
-
-    drawSticker(stickerData) {
-        const ctx = this.editor.ctx;
+    
+    renderStickerLayer(layer, ctx = this.editor.ctx) {
+        this.drawSticker(layer, ctx);
+    }
+    
+    drawSticker(layer, ctx = this.editor.ctx) {
+        const stickerData = layer.data;
         ctx.save();
+        
+        ctx.globalAlpha = layer.opacity;
+        ctx.translate(stickerData.x, stickerData.y);
+        ctx.rotate(stickerData.rotation * Math.PI / 180);
+        
+        const scale = layer.animationScale || 1;
+        const finalSize = stickerData.size * scale;
 
-        // Scale font size appropriately for canvas
-        const rect = this.editor.canvas.getBoundingClientRect();
-        const scaleX = this.editor.canvas.width / rect.width;
-        const fontSize = stickerData.size * scaleX;
-
-        ctx.font = `${fontSize}px Arial`;
+        ctx.font = `${finalSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        ctx.fillText(stickerData.emoji, 0, 0);
 
-        // Draw emoji
-        ctx.fillText(stickerData.emoji, stickerData.x, stickerData.y);
-
-        ctx.restore();
-    }
-
-    renderStickerLayer(layer) {
-        this.drawSticker(layer.data);
-    }
-
-    cancelStickerMode() {
-        this.isActive = false;
-        this.selectedSticker = null;
-        
-        // Remove highlighting
-        document.querySelectorAll('.sticker-btn').forEach(btn => {
-            btn.classList.remove('ring-2', 'ring-blue-500');
-        });
-        
-        // Hide controls
-        document.getElementById('sticker-controls').classList.add('hidden');
-        
-        // Reset cursor
-        this.editor.canvas.style.cursor = 'default';
-        
-        // Clean up preview
-        if (this.cleanupPreview) {
-            this.cleanupPreview();
+        // Draw selection indicator if this sticker is active
+        if (this.activeStickerLayer && this.activeStickerLayer.id === layer.id) {
+            const size = finalSize;
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(-size / 2, -size / 2, size, size);
         }
+        
+        ctx.restore();
     }
 } 

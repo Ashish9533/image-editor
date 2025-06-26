@@ -17,16 +17,20 @@ class ImageEditor {
                 { CropTool },
                 { TextTool },
                 { StickerTool },
+                { ShapesTool },
                 { LayerManager },
                 { FilterTool },
-                { HistoryManager }
+                { HistoryManager },
+                { AnimationTool }
             ] = await Promise.all([
                 import('./CropTool.js'),
                 import('./TextTool.js'),
                 import('./StickerTool.js'),
+                import('./ShapesTool.js'),
                 import('./LayerManager.js'),
                 import('./FilterTool.js'),
-                import('./HistoryManager.js')
+                import('./HistoryManager.js'),
+                import('./AnimationTool.js')
             ]);
 
             // Get canvas element
@@ -41,7 +45,9 @@ class ImageEditor {
             this.tools.crop = new CropTool(this);
             this.tools.text = new TextTool(this);
             this.tools.sticker = new StickerTool(this);
+            this.tools.shapes = new ShapesTool(this);
             this.tools.filter = new FilterTool(this);
+            this.tools.animation = new AnimationTool(this);
 
             // Setup event listeners
             this.setupEventListeners();
@@ -62,7 +68,29 @@ class ImageEditor {
         fileInput.addEventListener('change', (e) => this.handleImageUpload(e));
 
         // Main controls
-        document.getElementById('save-btn').addEventListener('click', () => this.saveImage());
+        const saveDropdownBtn = document.getElementById('save-dropdown-btn');
+        const saveOptionsMenu = document.getElementById('save-options-menu');
+        document.querySelectorAll('.save-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.preventDefault();
+                const format = e.target.dataset.format;
+                const quality = e.target.dataset.quality ? parseFloat(e.target.dataset.quality) : 1.0;
+                this.saveImage(format, quality);
+                saveOptionsMenu.classList.add('hidden');
+            });
+        });
+
+        saveDropdownBtn.addEventListener('click', () => {
+            saveOptionsMenu.classList.toggle('hidden');
+        });
+
+        // Hide dropdown if clicked outside
+        document.addEventListener('click', (e) => {
+            if (!document.getElementById('save-options-container').contains(e.target)) {
+                saveOptionsMenu.classList.add('hidden');
+            }
+        });
+
         document.getElementById('reset-btn').addEventListener('click', () => this.resetImage());
         document.getElementById('undo-btn').addEventListener('click', () => this.historyManager.undo());
         document.getElementById('redo-btn').addEventListener('click', () => this.historyManager.redo());
@@ -111,7 +139,7 @@ class ImageEditor {
         this.drawImage();
 
         // Enable controls
-        document.getElementById('save-btn').disabled = false;
+        document.getElementById('save-dropdown-btn').disabled = false;
         document.getElementById('reset-btn').disabled = false;
 
         // Initialize layer with the image
@@ -133,10 +161,11 @@ class ImageEditor {
         this.layerManager.renderAllLayers();
     }
 
-    saveImage() {
+    saveImage(format = 'png', quality = 1.0) {
+        const mimeType = `image/${format}`;
         const link = document.createElement('a');
-        link.download = 'edited-image.png';
-        link.href = this.canvas.toDataURL();
+        link.download = `edited-image-${Date.now()}.${format}`;
+        link.href = this.canvas.toDataURL(mimeType, quality);
         link.click();
     }
 
