@@ -675,10 +675,16 @@ export class CropTool {
         this.isResizing = false;
         this.showGrid = false;
         
-        // Restore original canvas style (keep original size!)
+        // Only restore original canvas style if we haven't applied a crop
+        // After crop is applied, the canvas dimensions have changed, so we shouldn't restore old styles
         const canvas = this.editor.canvas;
-        if (canvas && this.originalCanvasStyle) {
-            Object.assign(canvas.style, this.originalCanvasStyle);
+        if (canvas && this.originalCanvasStyle && this.cropArea.width > 0) {
+            // Clear any transform or positioning styles that might interfere with the new dimensions
+            canvas.style.transform = '';
+            canvas.style.left = '';
+            canvas.style.top = '';
+            canvas.style.position = '';
+            // Don't restore width/height as they should match the cropped image
         }
         
         const cropToggle = document.getElementById('crop-toggle');
@@ -701,6 +707,9 @@ export class CropTool {
         document.querySelectorAll('.crop-preset').forEach(preset => {
             preset.classList.remove('bg-blue-100', 'border-blue-500', 'text-blue-700');
         });
+        
+        // Clear the stored original style to prevent issues with future crops
+        this.originalCanvasStyle = {};
     }
 
     applyCrop() {
@@ -741,16 +750,24 @@ export class CropTool {
             0, 0, actualCrop.width, actualCrop.height
         );
 
-        // Update main canvas
-        canvas.width = actualCrop.width;
-        canvas.height = actualCrop.height;
-        this.editor.ctx.clearRect(0, 0, actualCrop.width, actualCrop.height);
-        this.editor.ctx.drawImage(croppedCanvas, 0, 0);
-
-        // Create new image from cropped canvas
+        // Create new image from cropped canvas (synchronous approach)
         const croppedImage = new Image();
+        const croppedDataURL = croppedCanvas.toDataURL();
+        
         croppedImage.onload = () => {
+            // Update main canvas dimensions and content
+            canvas.width = actualCrop.width;
+            canvas.height = actualCrop.height;
+            this.editor.ctx.clearRect(0, 0, actualCrop.width, actualCrop.height);
+            this.editor.ctx.drawImage(croppedImage, 0, 0);
+
+            // Update editor image references
             this.editor.currentImage = croppedImage;
+            this.editor.originalImage = croppedImage; // Update original image too so reset works correctly
+            
+            // Reset and update layer manager with the cropped image
+            this.editor.layerManager.reset();
+            this.editor.layerManager.addLayer('Background', croppedImage);
             
             // Update image info in modal if available
             if (this.editor.modalController) {
@@ -761,11 +778,13 @@ export class CropTool {
                 });
             }
             
+            // Cancel crop mode first
+            this.cancelCrop();
+            
+            // Save state after everything is updated
             this.editor.historyManager.saveState();
         };
-        croppedImage.src = croppedCanvas.toDataURL();
-
-        // Cancel crop mode
-        this.cancelCrop();
+        
+        croppedImage.src = croppedDataURL;
     }
 } 
