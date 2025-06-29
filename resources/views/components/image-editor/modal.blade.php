@@ -1,4 +1,4 @@
-<!-- Image Editor Modal -->
+Image Editor Modal
 <div id="image-editor-modal" class="hidden fixed inset-0 z-50 overflow-hidden">
     <!-- Modal Overlay -->
     <div id="modal-overlay" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
@@ -39,7 +39,7 @@
                 <div class="w-80 bg-gray-50 border-r border-gray-200 overflow-y-auto">
                     <div class="p-4 space-y-4">
                         <!-- Tool Tabs -->
-                        <div class="grid grid-cols-5 gap-1 bg-gray-200 p-1 rounded-lg">
+                        <div class="grid grid-cols-4 gap-1 bg-gray-200 p-1 rounded-lg">
                             <button class="tool-tab active px-3 py-2 rounded text-sm font-medium" data-tool="crop">
                                 <svg class="w-4 h-4 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -82,6 +82,24 @@
                                 </svg>
                                 <span class="text-xs">Animations</span>
                             </button>
+                            <button class="tool-tab px-3 py-2 rounded text-sm font-medium" data-tool="frames">
+                                <svg class="w-4 h-4 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h16v16H4z"/>
+                                </svg>
+                                <span class="text-xs">Frames</span>
+                            </button>
+                            <button class="tool-tab px-3 py-2 rounded text-sm font-medium" data-tool="adjust">
+                                <svg class="w-4 h-4 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                <span class="text-xs">Adjust</span>
+                            </button>
+                            <button class="tool-tab px-3 py-2 rounded text-sm font-medium" data-tool="histogram">
+                                <svg class="w-4 h-4 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                                </svg>
+                                <span class="text-xs">Histogram</span>
+                            </button>
                         </div>
                         
                         <!-- Tool Panels -->
@@ -106,6 +124,15 @@
                             </div>
                             <div id="tool-animations" class="tool-panel-content hidden">
                                 <x-image-editor.animations-panel />
+                            </div>
+                            <div id="tool-frames" class="tool-panel-content hidden">
+                                <x-image-editor.frames-panel />
+                            </div>
+                            <div id="tool-adjustments" class="tool-panel-content hidden">
+                                <x-image-editor.adjustments-panel />
+                            </div>
+                            <div id="tool-histogram" class="tool-panel-content hidden">
+                                <x-image-editor.histogram-panel />
                             </div>
                         </div>
                     </div>
@@ -189,4 +216,42 @@
             </div>
         </div>
     </div>
-</div> 
+</div>
+
+<script type="module">
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Initialize modal functionality
+        const openBtn = document.getElementById('open-editor-modal');
+        const modal = document.getElementById('image-editor-modal');
+        const modalOverlay = document.getElementById('modal-overlay');
+        
+        let imageEditor = null;
+        let modalController = null;
+        
+        // Open modal
+        openBtn.addEventListener('click', async () => {
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+            
+            // Initialize controllers if not already done
+            if (!modalController && window.ModalController) {
+                modalController = new ModalController();
+            }
+            
+            if (!imageEditor && window.ImageEditor) {
+                imageEditor = new ImageEditor();
+                if (modalController) {
+                    imageEditor.modalController = modalController;
+                }
+                await imageEditor.init();
+            }
+        });
+        
+        // Close modal
+        const closeBtn = document.getElementById('close-modal');
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        });
+    });
+</script> 

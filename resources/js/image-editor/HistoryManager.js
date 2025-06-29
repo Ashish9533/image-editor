@@ -35,6 +35,7 @@ export class HistoryManager {
             canvasData: this.editor.getCurrentCanvasData(),
             layersData: this.editor.layerManager.getLayersData(),
             filtersState: this.editor.tools.filter.getFiltersState(),
+            frameState: this.editor.tools.frames ? this.editor.tools.frames.getFrameState() : null,
             timestamp: Date.now()
         };
 
@@ -75,6 +76,11 @@ export class HistoryManager {
         
         // Restore filters
         this.editor.tools.filter.restoreFiltersState(state.filtersState);
+
+        // Restore frame tool state
+        if (state.frameState && this.editor.tools.frames) {
+            this.editor.tools.frames.restoreFrameState(state.frameState);
+        }
     }
 
     updateButtons() {

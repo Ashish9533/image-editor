@@ -167,8 +167,6 @@
             async init() {
                 this.setupEventListeners();
                 await this.loadImages();
-                // Setup modal functionality after DOM is ready
-                this.setupModalEventListeners();
             }
 
             setupEventListeners() {
@@ -210,29 +208,23 @@
             }
 
             setupModalEventListeners() {
-                // Setup modal event listeners after a short delay to ensure DOM is ready
-                setTimeout(() => {
-                    const closeModalBtn = document.getElementById('close-modal');
-                    const closeModalFooterBtn = document.getElementById('close-modal-footer');
-                    const modalOverlay = document.getElementById('modal-overlay');
+                const closeModalBtn = document.getElementById('close-modal');
+                const closeModalFooterBtn = document.getElementById('close-modal-footer');
+                const modalOverlay = document.getElementById('modal-overlay');
 
-                    if (closeModalBtn) {
-                        closeModalBtn.addEventListener('click', () => this.closeEditorModal());
-                    }
-                    if (closeModalFooterBtn) {
-                        closeModalFooterBtn.addEventListener('click', () => this.closeEditorModal());
-                    }
-                    if (modalOverlay) {
-                        modalOverlay.addEventListener('click', (e) => {
-                            if (e.target === modalOverlay) {
-                                this.closeEditorModal();
-                            }
-                        });
-                    }
-
-                    // Setup tool tab switching
-                    this.setupToolTabs();
-                }, 100);
+                if (closeModalBtn) {
+                    closeModalBtn.addEventListener('click', () => this.closeEditorModal());
+                }
+                if (closeModalFooterBtn) {
+                    closeModalFooterBtn.addEventListener('click', () => this.closeEditorModal());
+                }
+                if (modalOverlay) {
+                    modalOverlay.addEventListener('click', (e) => {
+                        if (e.target === modalOverlay) {
+                            this.closeEditorModal();
+                        }
+                    });
+                }
             }
 
             setupToolTabs() {
@@ -412,6 +404,10 @@
                     this.imageEditor.closeBrowserModal = () => this.closeEditorModal();
                     
                     await this.imageEditor.init();
+                    
+                    // Setup listeners now that the editor and its components are initialized
+                    this.setupModalEventListeners();
+                    this.setupToolTabs();
                 }
                 
                 // Load the image

@@ -35,7 +35,8 @@ export class LayerManager {
             opacity: 1,
             visible: true,
             animation: null, // To store animation settings
-            originalOpacity: 1 // Store the base opacity
+            originalOpacity: 1, // Store the base opacity
+            blendMode: 'source-over'
         };
 
         this.layers.push(layer);
@@ -184,9 +185,21 @@ export class LayerManager {
             
             this.editor.ctx.save();
             this.editor.ctx.globalAlpha = layer.opacity;
+            this.editor.ctx.globalCompositeOperation = layer.blendMode || 'source-over';
 
-            if (layer.animation && layer.animation.type === 'wipe' && layer.animationProgress != null) {
-                this.applyWipeAnimation(layer);
+            if (layer.curves) {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = this.editor.canvas.width;
+                tempCanvas.height = this.editor.canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                this.drawLayer(layer, tempCtx);
+                
+                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                this.editor.tools.histogram.applyCurve(imageData.data, layer.curves);
+                tempCtx.putImageData(imageData, 0, 0);
+
+                this.editor.ctx.drawImage(tempCanvas, 0, 0);
             } else {
                 this.drawLayer(layer);
             }
@@ -210,6 +223,11 @@ export class LayerManager {
                 break;
             case 'shape':
                 this.editor.tools.shapes.renderShapeLayer(layer, ctx);
+                break;
+            case 'frame':
+                if (layer.data instanceof HTMLCanvasElement) {
+                    ctx.drawImage(layer.data, 0, 0);
+                }
                 break;
         }
     }

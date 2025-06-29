@@ -2,6 +2,7 @@ class ImageEditor {
     constructor() {
         this.canvas = null;
         this.ctx = null;
+        this.canvasContainer = null;
         this.originalImage = null;
         this.currentImage = null;
         this.tools = {};
@@ -11,20 +12,24 @@ class ImageEditor {
         this.originalImageName = null; // Store original image name for saving
         this.zoomLevel = 1; // Add zoom level tracking
         this.originalCanvasSize = { width: 0, height: 0 }; // Store original size
+        this.activeTool = null;
     }
 
     async init() {
         try {
             // Import all tool modules
             const [
-                { CropTool },
-                { TextTool },
-                { StickerTool },
-                { ShapesTool },
-                { LayerManager },
-                { FilterTool },
-                { HistoryManager },
-                { AnimationTool }
+                cropModule,
+                textModule,
+                stickerModule,
+                shapesModule,
+                layerManagerModule,
+                filterModule,
+                historyManagerModule,
+                animationModule,
+                frameModule,
+                adjustmentsModule,
+                histogramModule
             ] = await Promise.all([
                 import('./CropTool.js'),
                 import('./TextTool.js'),
@@ -33,12 +38,28 @@ class ImageEditor {
                 import('./LayerManager.js'),
                 import('./FilterTool.js'),
                 import('./HistoryManager.js'),
-                import('./AnimationTool.js')
+                import('./AnimationTool.js'),
+                import('./FrameTool.js'),
+                import('./AdjustmentsTool.js'),
+                import('./HistogramTool.js')
             ]);
+
+            const { CropTool } = cropModule;
+            const { TextTool } = textModule;
+            const { StickerTool } = stickerModule;
+            const { ShapesTool } = shapesModule;
+            const { LayerManager } = layerManagerModule;
+            const { FilterTool } = filterModule;
+            const { HistoryManager } = historyManagerModule;
+            const { AnimationTool } = animationModule;
+            const { FrameTool } = frameModule;
+            const { AdjustmentsTool } = adjustmentsModule;
+            const { HistogramTool } = histogramModule;
 
             // Get canvas element
             this.canvas = document.getElementById('main-canvas');
             this.ctx = this.canvas.getContext('2d');
+            this.canvasContainer = document.getElementById('canvas-container');
 
             // Initialize managers
             this.layerManager = new LayerManager(this);
@@ -51,9 +72,13 @@ class ImageEditor {
             this.tools.shapes = new ShapesTool(this);
             this.tools.filter = new FilterTool(this);
             this.tools.animation = new AnimationTool(this);
+            this.tools.frames = new FrameTool(this);
+            this.tools.adjustments = new AdjustmentsTool(this);
+            this.tools.histogram = new HistogramTool(this);
 
             // Setup event listeners
             this.setupEventListeners();
+            this.setupToolbarListeners();
             
             this.isInitialized = true;
             
@@ -483,6 +508,79 @@ class ImageEditor {
 
     setCanvasData(imageData) {
         this.ctx.putImageData(imageData, 0, 0);
+    }
+
+    setupToolbarListeners() {
+        // Custom tab/panel logic for all tools
+        const toolTabs = document.querySelectorAll('.tool-tab');
+        const toolPanels = document.querySelectorAll('.tool-panel-content');
+        toolTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const toolName = tab.getAttribute('data-tool');
+                // Remove active from all tabs
+                toolTabs.forEach(t => t.classList.remove('active'));
+                // Add active to clicked tab
+                tab.classList.add('active');
+                // Hide all panels
+                toolPanels.forEach(panel => panel.classList.add('hidden'));
+                // Show the selected panel
+                const selectedPanel = document.getElementById(`tool-${toolName}`);
+                if (selectedPanel) {
+                    selectedPanel.classList.remove('hidden');
+                }
+                // Activate the tool in JS
+                if (this.tools[toolName] && typeof this.setActiveTool === 'function') {
+                    this.setActiveTool(toolName);
+                }
+            });
+        });
+    }
+
+    setActiveTool(toolId) {
+        const toolName = toolId ? toolId.replace(/-([a-z])/g, g => g[1].toUpperCase()) : null;
+        const panelsContainer = document.getElementById('panels-container');
+
+        // Deactivate the currently active tool first.
+        if (this.activeTool && this.tools[this.activeTool]?.deactivate) {
+            this.tools[this.activeTool].deactivate();
+        }
+
+        // Always hide all panels and deactivate all buttons to ensure a clean state.
+        document.querySelectorAll('.image-editor-panel').forEach(p => p.classList.add('hidden'));
+        document.querySelectorAll('[id^="tool-"]').forEach(b => b.classList.remove('active'));
+
+        // If the same tool is clicked again, or if no tool is provided, turn everything off.
+        if (!toolId || this.activeTool === toolName) {
+            this.activeTool = null;
+            if (panelsContainer) panelsContainer.style.width = '0';
+            return;
+        }
+
+        const tool = this.tools[toolName];
+        const panel = document.getElementById(`tool-${toolId}`);
+        const button = document.getElementById(`tool-${toolId}`);
+
+        if (!tool || !button) {
+            console.error(`Components for tool '${toolId}' could not be found.`);
+            this.activeTool = null;
+            if (panelsContainer) panelsContainer.style.width = '0';
+            return;
+        }
+
+        // Show the panel for the new tool.
+        panel.classList.remove('hidden');
+        button.classList.add('active');
+        if (panelsContainer) {
+            panelsContainer.style.width = '20rem';
+        }
+        
+        // Set the new tool as active.
+        this.activeTool = toolName;
+
+        // Finally, run the tool's specific activation logic.
+        if (typeof tool.activate === 'function') {
+            tool.activate();
+        }
     }
 }
 
