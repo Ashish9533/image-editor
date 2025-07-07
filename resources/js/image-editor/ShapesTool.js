@@ -10,7 +10,7 @@ export class ShapesTool {
         this.selectedShape = null;
         this.shapeCounter = 0;
 
-        this.properties = {
+        this.defaultProperties = {
             fillEnabled: true,
             fillType: 'solid',
             fillColor: '#4F46E5',
@@ -26,6 +26,7 @@ export class ShapesTool {
             shadow: false,
             shadowColor: '#000000'
         };
+        this.properties = { ...this.defaultProperties };
 
         this.tempLayer = null; // For live preview
 
@@ -173,6 +174,7 @@ export class ShapesTool {
         if (this.mode !== 'draw') return;
         
         this.activeTool = tool;
+        this.resetProperties(); // Reset properties when a new tool is selected
         
         // UI Updates
         document.querySelectorAll('.drawing-tool-btn').forEach(btn => btn.classList.remove('ring-2', 'ring-purple-500'));
@@ -200,7 +202,10 @@ export class ShapesTool {
     cancelDrawing() {
         this.activeTool = null;
         this.isDrawing = false;
-        this.selectedShape = null;
+        if (this.selectedShape) {
+            this.selectedShape = null;
+            this.resetProperties();
+        }
         document.querySelectorAll('.drawing-tool-btn').forEach(btn => btn.classList.remove('ring-2', 'ring-purple-500'));
         document.getElementById('shape-properties').classList.add('hidden');
         document.getElementById('shape-instructions').classList.add('hidden');
@@ -241,6 +246,8 @@ export class ShapesTool {
                 this.selectShape(shapeId);
             });
         });
+
+        this.editor.redraw();
     }
 
     selectShape(layerId) {
@@ -259,31 +266,32 @@ export class ShapesTool {
     }
 
     loadShapeProperties(shapeData) {
-        // Load properties into UI
-        document.getElementById('shape-fill-enable').checked = shapeData.fillEnabled;
-        document.getElementById('fill-type').value = shapeData.fillType || 'solid';
-        document.getElementById('shape-fill-color').value = shapeData.fillColor || '#4F46E5';
-        document.getElementById('fill-opacity').value = (shapeData.fillOpacity || 1) * 100;
-        document.getElementById('fill-opacity-value').textContent = `${Math.round((shapeData.fillOpacity || 1) * 100)}%`;
-        
-        document.getElementById('gradient-color1').value = shapeData.gradientColor1 || '#4F46E5';
-        document.getElementById('gradient-color2').value = shapeData.gradientColor2 || '#EC4899';
-        document.getElementById('gradient-direction').value = shapeData.gradientDirection || 'horizontal';
-        document.getElementById('pattern-type').value = shapeData.patternType || 'dots';
-        
-        document.getElementById('shape-stroke-color').value = shapeData.strokeColor || '#000000';
-        document.getElementById('shape-stroke-width').value = shapeData.strokeWidth || 2;
-        document.getElementById('shape-stroke-width-value').textContent = `${shapeData.strokeWidth || 2}px`;
-        document.getElementById('stroke-style').value = shapeData.strokeStyle || 'solid';
-        
-        document.getElementById('shape-rotation').value = shapeData.rotation || 0;
-        document.getElementById('shape-rotation-value').textContent = `${shapeData.rotation || 0}°`;
-        document.getElementById('shape-shadow').checked = shapeData.shadow || false;
-        document.getElementById('shadow-color').value = shapeData.shadowColor || '#000000';
-        document.getElementById('shadow-color').disabled = !shapeData.shadow;
-
-        // Update internal properties
+        // Update internal properties before updating UI
         Object.assign(this.properties, shapeData);
+
+        // Load properties into UI
+        document.getElementById('shape-fill-enable').checked = this.properties.fillEnabled;
+        document.getElementById('fill-type').value = this.properties.fillType || 'solid';
+        document.getElementById('shape-fill-color').value = this.properties.fillColor || '#4F46E5';
+        document.getElementById('fill-opacity').value = (this.properties.fillOpacity || 1) * 100;
+        document.getElementById('fill-opacity-value').textContent = `${Math.round((this.properties.fillOpacity || 1) * 100)}%`;
+        
+        document.getElementById('gradient-color1').value = this.properties.gradientColor1 || '#4F46E5';
+        document.getElementById('gradient-color2').value = this.properties.gradientColor2 || '#EC4899';
+        document.getElementById('gradient-direction').value = this.properties.gradientDirection || 'horizontal';
+        document.getElementById('pattern-type').value = this.properties.patternType || 'dots';
+        
+        document.getElementById('shape-stroke-color').value = this.properties.strokeColor || '#000000';
+        document.getElementById('shape-stroke-width').value = this.properties.strokeWidth || 2;
+        document.getElementById('shape-stroke-width-value').textContent = `${this.properties.strokeWidth || 2}px`;
+        document.getElementById('stroke-style').value = this.properties.strokeStyle || 'solid';
+        
+        document.getElementById('shape-rotation').value = this.properties.rotation || 0;
+        document.getElementById('shape-rotation-value').textContent = `${this.properties.rotation || 0}°`;
+        document.getElementById('shape-shadow').checked = this.properties.shadow || false;
+        document.getElementById('shadow-color').value = this.properties.shadowColor || '#000000';
+        document.getElementById('shadow-color').disabled = !this.properties.shadow;
+
         this.toggleFillOptions();
     }
 
@@ -307,7 +315,14 @@ export class ShapesTool {
         this.editor.layerManager.deleteLayer(this.selectedShape.id);
         this.selectedShape = null;
         this.editor.historyManager.saveState();
-        this.cancelDrawing();
+        
+        this.resetProperties();
+        // Explicitly hide panels and reset UI instead of calling cancelDrawing
+        document.getElementById('shape-properties').classList.add('hidden');
+        document.getElementById('apply-shape-changes').classList.add('hidden');
+        document.getElementById('selection-actions').classList.add('hidden');
+        
+        this.updateShapesList();
         this.editor.redraw();
     }
 
@@ -887,5 +902,40 @@ export class ShapesTool {
         // Top right curve
         ctx.bezierCurveTo(x + width, y, x + width / 2, y, x + width / 2, y + topCurveHeight);
         ctx.closePath();
+    }
+
+    resetProperties() {
+        this.properties = { ...this.defaultProperties };
+        // Pass a copy to avoid circular references or unintended modifications
+        this.updateUiWithProperties({ ...this.properties });
+    }
+
+    updateUiWithProperties(props) {
+        document.getElementById('shape-fill-enable').checked = props.fillEnabled;
+        document.getElementById('fill-type').value = props.fillType;
+        document.getElementById('shape-fill-color').value = props.fillColor;
+        const fillOpacityValue = Math.round((props.fillOpacity || 1) * 100);
+        document.getElementById('fill-opacity').value = fillOpacityValue;
+        document.getElementById('fill-opacity-value').textContent = `${fillOpacityValue}%`;
+        
+        document.getElementById('gradient-color1').value = props.gradientColor1;
+        document.getElementById('gradient-color2').value = props.gradientColor2;
+        document.getElementById('gradient-direction').value = props.gradientDirection;
+        document.getElementById('pattern-type').value = props.patternType;
+        
+        document.getElementById('shape-stroke-color').value = props.strokeColor;
+        const strokeWidthValue = props.strokeWidth || 2;
+        document.getElementById('shape-stroke-width').value = strokeWidthValue;
+        document.getElementById('shape-stroke-width-value').textContent = `${strokeWidthValue}px`;
+        document.getElementById('stroke-style').value = props.strokeStyle;
+        
+        const rotationValue = props.rotation || 0;
+        document.getElementById('shape-rotation').value = rotationValue;
+        document.getElementById('shape-rotation-value').textContent = `${rotationValue}°`;
+        document.getElementById('shape-shadow').checked = props.shadow || false;
+        document.getElementById('shadow-color').value = props.shadowColor || '#000000';
+        document.getElementById('shadow-color').disabled = !props.shadow;
+
+        this.toggleFillOptions();
     }
 } 
